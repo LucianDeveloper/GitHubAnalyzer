@@ -8,15 +8,19 @@ from typing import List, Union, Callable
 
 
 def create_parser():
+    """:return: Парсер параметров, указанных при запуске скрипта"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', '--url', default='https://github.com/aiogram/aiogram/')
     parser.add_argument('-s', '--start', default=None)
-    parser.add_argument('-e', '--end', default='2020-11-09')
-    parser.add_argument('-b', '--branch', default='dev-2.x')
+    parser.add_argument('-e', '--end', default=None)
+    parser.add_argument('-b', '--branch', default='master')
     return parser
 
 
 class AnalyseException(Exception):
+    """
+    Класс для обработки исключений, связанных с работой скрипта
+    """
     def __init__(self, text: str):
         self.text = text
 
@@ -25,6 +29,10 @@ class AnalyseException(Exception):
 
     @staticmethod
     def get_error_or_json(response: Response) -> List[dict]:
+        """
+        :param response: Ответ на GET запрос
+        :return: Если ответ корректен, возвращает json обьект, иначе вызывает исключение
+        """
         if response.status_code != 200:
             raise AnalyseException(
                 f'При выполнении запроса {response.request} произошла ошибка.\n'
@@ -36,10 +44,18 @@ class AnalyseException(Exception):
 
 
 class GitHubAnalyzer:
+    """Класс анализатора GitHub репозиториев"""
+
     API_URL = 'https://api.github.com/repos'
     BASE_LINE = '=' * 80
 
     def __init__(self, url: str, start: datetime, end: datetime, branch: str):
+        """
+        :param url: Адрес репозитория
+        :param start: Дата начала анализа
+        :param end: Дата конца анализа
+        :param branch: Имя анализируемой ветки
+        """
         self.user, self.rep = GitHubAnalyzer.get_params_by_url(url)
         self.base_url = f'{GitHubAnalyzer.API_URL}/{self.user}/{self.rep}'
         self.start: datetime = start
@@ -54,7 +70,8 @@ class GitHubAnalyzer:
         ))
         print(GitHubAnalyzer.BASE_LINE)
 
-    def show_top_comments(self) -> None:
+    def show_top_commits(self) -> None:
+        """Вывод на экран 30 самых активных участников"""
         print(GitHubAnalyzer.BASE_LINE)
         print('%s  %-30s | %3s' % ('N', 'Name', 'Count'))
         for index, item in enumerate(self.get_top_commits(), 1):
@@ -62,6 +79,7 @@ class GitHubAnalyzer:
         print(GitHubAnalyzer.BASE_LINE)
 
     def show_pr_info(self) -> None:
+        """Вывод информации о Pull Requests на экран"""
         pulls = self.get_pull_requests()
         closed_pulls_n = len(list(filter(lambda pull: pull['state'] != 'open', pulls)))
         old_pulls_n = len(list(filter(
@@ -70,14 +88,21 @@ class GitHubAnalyzer:
         self.print_info(len(pulls) - closed_pulls_n, closed_pulls_n, old_pulls_n, 'PR')
 
     @staticmethod
-    def print_info(open_n: int, close_n: int, old_n: int, name: str):
+    def print_info(open_n: int, close_n: int, old_n: int, name: str) -> None:
+        """
+        :param open_n: Количество открытых элементов
+        :param close_n: Количество закрытых элементов
+        :param old_n: Количество устаревших элементов
+        :param name: Название элементов
+        """
         print(GitHubAnalyzer.BASE_LINE)
         print(f'| Open {name} = {open_n}\n'
               f'| Closed {name} = {close_n}\n'
               f'| Old {name} = {old_n}')
         print(GitHubAnalyzer.BASE_LINE)
 
-    def show_issues_info(self):
+    def show_issues_info(self) -> None:
+        """Вывод информации о Issues на экран"""
         url = f'{self.base_url}/issues?'
         if self.start is not None:
             url += f'since={self.start.strftime("%Y-%m-%d")}&'
@@ -93,6 +118,10 @@ class GitHubAnalyzer:
 
     @staticmethod
     def get_params_by_url(url: str) -> List[str]:
+        """
+        :param url: Адрес GitHub репозитория
+        :return: Список из двух элементов - [user, repository]
+        """
         params = url.replace('github.com/', '').replace('https://', '').split('/')[:2]
         if len(params) != 2:
             raise AnalyseException(
@@ -106,6 +135,12 @@ class GitHubAnalyzer:
             date: Union[datetime, None],
             func: Callable[[datetime, datetime], bool]
     ) -> bool:
+        """
+        :param my_date: Дата начала или конца анализа, None если анализ не ограничен
+        :param date: Какая то другая дата или None
+        :param func: функция для сравнения дат
+        :return: результат сравнения дат при помощи функции func
+        """
         if my_date is None:
             return True
         if date is None:
@@ -113,6 +148,9 @@ class GitHubAnalyzer:
         return func(my_date, date)
 
     def get_top_commits(self) -> List:
+        """
+        :return: Список 30 самых активных пользователей в порядке убывания
+        """
         url = f'{self.base_url}/commits'
         if self.branch is not None:
             url += f'?sha={self.branch}'
@@ -134,6 +172,9 @@ class GitHubAnalyzer:
         )[:30]
 
     def get_pull_requests(self) -> List:
+        """
+        :return: Список Pull Requests согласно настроек анализа
+        """
         pulls = []
         page = 1
         while True:
@@ -164,6 +205,10 @@ class GitHubAnalyzer:
 
     @staticmethod
     def get_input_date_by_format(date: str) -> Union[datetime, None]:
+        """
+        :param date: Дата, указанная в строковом формате
+        :return: Объект datetime или None, если дата указана неверно или не указана
+        """
         if date is None:
             return None
         x = regex.search(
@@ -185,6 +230,6 @@ if __name__ == '__main__':
         branch=namespace.branch
     )
 
-    analyzer.show_top_comments()
+    analyzer.show_top_commits()
     analyzer.show_pr_info()
     analyzer.show_issues_info()
