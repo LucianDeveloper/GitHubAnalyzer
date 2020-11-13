@@ -1,4 +1,5 @@
 import requests as r
+from requests.models import Response
 import sys
 import argparse
 from datetime import datetime
@@ -13,6 +14,25 @@ def create_parser():
     parser.add_argument('-e', '--end', default='2020-11-09')
     parser.add_argument('-b', '--branch', default='dev-2.x')
     return parser
+
+
+class AnalyseException(Exception):
+    def __init__(self, text: str):
+        self.text = text
+
+    def __str__(self):
+        print(f'{self.text}')
+
+    @staticmethod
+    def get_error_or_json(response: Response) -> List[dict]:
+        if response.status_code != 200:
+            raise AnalyseException(
+                f'При выполнении запроса {response.request} произошла ошибка.\n'
+                f'Код ответа: {response.status_code}\n'
+                f'\n'
+                f'{response.json()}'
+            )
+        return response.json()
 
 
 class GitHubAnalyzer:
@@ -37,8 +57,7 @@ class GitHubAnalyzer:
     def show_top_comments(self) -> None:
         print(GitHubAnalyzer.BASE_LINE)
         print('%s  %-30s | %3s' % ('N', 'Name', 'Count'))
-        commits = self.get_top_commits()
-        for index, item in enumerate(commits, 1):
+        for index, item in enumerate(self.get_top_commits(), 1):
             print('%d. %-30s | %3d' % (index, item['name'], item['count']))
         print(GitHubAnalyzer.BASE_LINE)
 
@@ -51,22 +70,21 @@ class GitHubAnalyzer:
         self.print_info(len(pulls) - closed_pulls_n, closed_pulls_n, old_pulls_n, 'PR')
 
     @staticmethod
-    def print_info(open: int, close: int, old: int, name: str):
+    def print_info(open_n: int, close_n: int, old_n: int, name: str):
         print(GitHubAnalyzer.BASE_LINE)
-        print(f'| Open {name} = {open}\n'
-              f'| Closed {name} = {close}\n'
-              f'| Old {name} = {old}')
+        print(f'| Open {name} = {open_n}\n'
+              f'| Closed {name} = {close_n}\n'
+              f'| Old {name} = {old_n}')
         print(GitHubAnalyzer.BASE_LINE)
 
     def show_issues_info(self):
         url = f'{self.base_url}/issues?'
         if self.start is not None:
             url += f'since={self.start.strftime("%Y-%m-%d")}&'
-        open_issues = r.get(f'{url}state=open').json()
-        close_issues = r.get(f'{url}state=closed').json()
+        open_issues = AnalyseException.get_error_or_json(r.get(f'{url}state=open'))
+        close_issues = AnalyseException.get_error_or_json(r.get(f'{url}state=closed'))
         issues = open_issues + close_issues
         close_n = len(close_issues)
-        print()
         old_pulls_n = len(list(filter(
             lambda issue: (datetime.today() - GitHubAnalyzer.get_input_date_by_format(issue['created_at'])).days > 14,
             open_issues
@@ -93,7 +111,7 @@ class GitHubAnalyzer:
         url = f'{self.base_url}/commits'
         if self.branch is not None:
             url += f'?sha={self.branch}'
-        commits = r.get(url).json()
+        commits = AnalyseException.get_error_or_json(r.get(url))
         commits = list(filter(
             lambda item: GitHubAnalyzer.compare_dates(
                 self.start, GitHubAnalyzer.get_input_date_by_format(item['commit']['committer']['date']),
@@ -114,7 +132,7 @@ class GitHubAnalyzer:
         pulls = []
         page = 1
         while True:
-            new_pulls = r.get(f'{self.base_url}/pulls?page={page}').json()
+            new_pulls = AnalyseException.get_error_or_json(r.get(f'{self.base_url}/pulls?page={page}'))
             if len(new_pulls) == 0:
                 break
             new_pulls = list(filter(
@@ -135,7 +153,6 @@ class GitHubAnalyzer:
                     'created_at': GitHubAnalyzer.get_input_date_by_format(pull['created_at']),
                     'closed_at': GitHubAnalyzer.get_input_date_by_format(pull['closed_at']),
                     'state': pull['state'],
-                    # 'issue_url': pull['issue_url'],
                 })
             page += 1
         return pulls
