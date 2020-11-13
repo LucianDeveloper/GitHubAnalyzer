@@ -21,7 +21,7 @@ class AnalyseException(Exception):
         self.text = text
 
     def __str__(self):
-        print(f'{self.text}')
+        return self.text
 
     @staticmethod
     def get_error_or_json(response: Response) -> List[dict]:
@@ -93,7 +93,12 @@ class GitHubAnalyzer:
 
     @staticmethod
     def get_params_by_url(url: str) -> List[str]:
-        return url.replace('github.com/', '').replace('https://', '').split('/')[:2]
+        params = url.replace('github.com/', '').replace('https://', '').split('/')[:2]
+        if len(params) != 2:
+            raise AnalyseException(
+                f'При обработке адреса {url} произошла ошибка. Невозможно '
+                f'извлечь имя пользователя и название репозитория')
+        return params
 
     @staticmethod
     def compare_dates(
