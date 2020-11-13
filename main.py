@@ -14,6 +14,7 @@ def create_parser():
     parser.add_argument('-s', '--start', default=None)
     parser.add_argument('-e', '--end', default=None)
     parser.add_argument('-b', '--branch', default='master')
+    parser.add_argument('-t', '--token', default=None)
     return parser
 
 
@@ -49,18 +50,27 @@ class GitHubAnalyzer:
     API_URL = 'https://api.github.com/repos'
     BASE_LINE = '=' * 80
 
-    def __init__(self, url: str, start: datetime, end: datetime, branch: str):
+    def __init__(self, url: str,
+                 start: datetime,
+                 end: datetime,
+                 branch: str,
+                 token: Union[str, None]):
         """
         :param url: Адрес репозитория
         :param start: Дата начала анализа
         :param end: Дата конца анализа
         :param branch: Имя анализируемой ветки
+        :param token: Токен доступа к github
         """
         self.user, self.rep = GitHubAnalyzer.get_params_by_url(url)
         self.base_url = f'{GitHubAnalyzer.API_URL}/{self.user}/{self.rep}'
         self.start: datetime = start
         self.end: datetime = end
         self.branch: str = branch
+
+        self.session = r.Session()
+        if token is not None:
+            self.session.headers['Authorization'] = 'token %s' % token
 
         print(GitHubAnalyzer.BASE_LINE)
         print('| repo = %-20s user = %-20s branch = %-20s' % (self.rep, self.user, self.branch))
@@ -73,9 +83,9 @@ class GitHubAnalyzer:
     def show_top_commits(self) -> None:
         """Вывод на экран 30 самых активных участников"""
         print(GitHubAnalyzer.BASE_LINE)
-        print('%s  %-30s | %3s' % ('N', 'Name', 'Count'))
+        print('%3s  %-30s | %3s' % ('N', 'Name', 'Count'))
         for index, item in enumerate(self.get_top_commits(), 1):
-            print('%d. %-30s | %3d' % (index, item['name'], item['count']))
+            print('%3d. %-30s | %3d' % (index, item['name'], item['count']))
         print(GitHubAnalyzer.BASE_LINE)
 
     def show_pr_info(self) -> None:
@@ -101,13 +111,23 @@ class GitHubAnalyzer:
               f'| Old {name} = {old_n}')
         print(GitHubAnalyzer.BASE_LINE)
 
+    def get_issues_by_param(self, url: str, param: str):
+        page = 0
+        issues = []
+        while page := page + 1:
+            tmp = AnalyseException.get_error_or_json(self.session.get(f'{url}state={param}&page={page}&per_page=1000'))
+            if len(tmp) == 0:
+                break
+            issues += tmp
+        return issues
+
     def show_issues_info(self) -> None:
         """Вывод информации о Issues на экран"""
         url = f'{self.base_url}/issues?'
         if self.start is not None:
             url += f'since={self.start.strftime("%Y-%m-%d")}&'
-        open_issues = AnalyseException.get_error_or_json(r.get(f'{url}state=open'))
-        close_issues = AnalyseException.get_error_or_json(r.get(f'{url}state=closed'))
+        close_issues = self.get_issues_by_param(url, 'open')
+        open_issues = self.get_issues_by_param(url, 'closed')
         issues = open_issues + close_issues
         close_n = len(close_issues)
         old_pulls_n = len(list(filter(
@@ -151,10 +171,10 @@ class GitHubAnalyzer:
         """
         :return: Список 30 самых активных пользователей в порядке убывания
         """
-        url = f'{self.base_url}/commits'
+        url = f'{self.base_url}/commits?per_page=1000'
         if self.branch is not None:
-            url += f'?sha={self.branch}'
-        commits = AnalyseException.get_error_or_json(r.get(url))
+            url += f'&sha={self.branch}'
+        commits = AnalyseException.get_error_or_json(self.session.get(url))
         commits = list(filter(
             lambda item: GitHubAnalyzer.compare_dates(
                 self.start, GitHubAnalyzer.get_input_date_by_format(item['commit']['committer']['date']),
@@ -165,7 +185,7 @@ class GitHubAnalyzer:
             ),
             commits
         ))
-        authors = [f"{c['commit']['author']['name']} ({c['committer']['login']})" for c in commits]
+        authors = [f"{c['commit']['author']['name']}" for c in commits]
         return sorted(
             [{'name': author, 'count': authors.count(author)} for author in set(authors)],
             key=lambda x: -x['count']
@@ -178,7 +198,8 @@ class GitHubAnalyzer:
         pulls = []
         page = 1
         while True:
-            new_pulls = AnalyseException.get_error_or_json(r.get(f'{self.base_url}/pulls?page={page}'))
+            new_pulls = AnalyseException.get_error_or_json(
+                self.session.get(f'{self.base_url}/pulls?page={page}&per_page=1000&state=all'))
             if len(new_pulls) == 0:
                 break
             new_pulls = list(filter(
@@ -227,7 +248,8 @@ if __name__ == '__main__':
         url=namespace.url,
         start=s_date,
         end=e_date,
-        branch=namespace.branch
+        branch=namespace.branch,
+        token=namespace.token,
     )
 
     analyzer.show_top_commits()

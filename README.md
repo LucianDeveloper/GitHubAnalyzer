@@ -22,4 +22,5 @@ Issue считается старым, если он не закрывается
 <tr><td>Дата начала анализа</td><td><i>-s</i></td><td><i>--start</i></td></tr>
 <tr><td>Дата конца анализа</td><td><i>-e</i></td><td><i>--end</i></td></tr>
 <tr><td>Имя ветки</td><td><i>-b</i></td><td><i>--branch</i></td></tr>
+<tr><td>Токен</td><td><i>-t</i></td><td><i>--token</i></td></tr>
 </table>
