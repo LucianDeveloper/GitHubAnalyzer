@@ -112,15 +112,16 @@ class GitHubAnalyzer:
         print(GitHubAnalyzer.BASE_LINE)
 
     def get_issues_by_param(self, url: str, param: str):
-        page = 0
+        page = 1
         issues = []
-        while page := page + 1:
+        while True:
             tmp = AnalyseException.get_error_or_json(self.session.get(f'{url}state={param}&page={page}&per_page=1000'))
             if len(tmp) == 0:
                 break
             issues += list(filter(
                 lambda issue: self.end > GitHubAnalyzer.get_input_date_by_format(issue['created_at']), tmp
             ))
+            page += 1
         return issues
 
     def show_issues_info(self) -> None:
