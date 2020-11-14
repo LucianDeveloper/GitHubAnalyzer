@@ -15,10 +15,7 @@ class TestDate(unittest.TestCase):
 
     @unittest.expectedFailure
     def test_fail(self):
-        self.assertRaises(
-            AnalyseException,
-            GitHubAnalyzer.get_input_date_by_format(1234578)
-        )
+        self.assertRaises(AnalyseException, GitHubAnalyzer.get_input_date_by_format(1234578))
 
     def test_date_compare(self):
         date_1 = datetime(year=2020, month=10, day=10)
