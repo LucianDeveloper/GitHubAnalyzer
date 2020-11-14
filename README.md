@@ -24,3 +24,7 @@ Issue считается старым, если он не закрывается
 <tr><td>Имя ветки</td><td><i>-b</i></td><td><i>--branch</i></td></tr>
 <tr><td>Токен</td><td><i>-t</i></td><td><i>--token</i></td></tr>
 </table>
+
+<h3>Запуск тестов:</h3>
+
+python -m unittest tests.py
