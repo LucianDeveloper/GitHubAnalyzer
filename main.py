@@ -118,7 +118,9 @@ class GitHubAnalyzer:
             tmp = AnalyseException.get_error_or_json(self.session.get(f'{url}state={param}&page={page}&per_page=1000'))
             if len(tmp) == 0:
                 break
-            issues += tmp
+            issues += list(filter(
+                lambda issue: self.end > GitHubAnalyzer.get_input_date_by_format(issue['created_at']), tmp
+            ))
         return issues
 
     def show_issues_info(self) -> None:
@@ -126,8 +128,8 @@ class GitHubAnalyzer:
         url = f'{self.base_url}/issues?'
         if self.start is not None:
             url += f'since={self.start.strftime("%Y-%m-%d")}&'
-        close_issues = self.get_issues_by_param(url, 'open')
-        open_issues = self.get_issues_by_param(url, 'closed')
+        close_issues = self.get_issues_by_param(url, 'closed')
+        open_issues = self.get_issues_by_param(url, 'open')
         issues = open_issues + close_issues
         close_n = len(close_issues)
         old_pulls_n = len(list(filter(
