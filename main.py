@@ -115,11 +115,15 @@ class GitHubAnalyzer:
         page = 1
         issues = []
         while True:
-            tmp = AnalyseException.get_error_or_json(self.session.get(f'{url}state={param}&page={page}&per_page=1000'))
+            tmp = AnalyseException.get_error_or_json(
+                self.session.get(f'{url}state={param}&page={page}&per_page=1000'))
             if len(tmp) == 0:
                 break
             issues += list(filter(
-                lambda issue: self.end > GitHubAnalyzer.get_input_date_by_format(issue['created_at']), tmp
+                lambda issue: GitHubAnalyzer.compare_dates(
+                    self.end, GitHubAnalyzer.get_input_date_by_format(issue['created_at']),
+                    lambda d1, d2: d1 > d2
+                ), tmp
             ))
             page += 1
         return issues
