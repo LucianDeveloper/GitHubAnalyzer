@@ -28,21 +28,6 @@ class AnalyseException(Exception):
     def __str__(self):
         return self.text
 
-    @staticmethod
-    def get_error_or_json(response: Response) -> List[dict]:
-        """
-        :param response: Ответ на GET запрос
-        :return: Если ответ корректен, возвращает json обьект, иначе вызывает исключение
-        """
-        if response.status_code != 200:
-            raise AnalyseException(
-                f'При выполнении запроса {response.request} произошла ошибка.\n'
-                f'Код ответа: {response.status_code}\n'
-                f'\n'
-                f'{response.json()}'
-            )
-        return response.json()
-
 
 class GitHubAnalyzer:
     """Класс анализатора GitHub репозиториев"""
@@ -80,6 +65,21 @@ class GitHubAnalyzer:
         ))
         print(GitHubAnalyzer.BASE_LINE)
 
+    @staticmethod
+    def get_error_or_json(response: Response) -> List[dict]:
+        """
+        :param response: Ответ на GET запрос
+        :return: Если ответ корректен, возвращает json обьект, иначе вызывает исключение
+        """
+        if response.status_code != 200:
+            raise AnalyseException(
+                f'При выполнении запроса {response.request} произошла ошибка.\n'
+                f'Код ответа: {response.status_code}\n'
+                f'\n'
+                f'{response.json()}'
+            )
+        return response.json()
+
     def show_top_commits(self) -> None:
         """Вывод на экран 30 самых активных участников"""
         print(GitHubAnalyzer.BASE_LINE)
@@ -115,7 +115,7 @@ class GitHubAnalyzer:
         page = 1
         issues = []
         while True:
-            tmp = AnalyseException.get_error_or_json(
+            tmp = GitHubAnalyzer.get_error_or_json(
                 self.session.get(f'{url}state={param}&page={page}&per_page=1000'))
             if len(tmp) == 0:
                 break
@@ -181,7 +181,7 @@ class GitHubAnalyzer:
         url = f'{self.base_url}/commits?per_page=1000'
         if self.branch is not None:
             url += f'&sha={self.branch}'
-        commits = AnalyseException.get_error_or_json(self.session.get(url))
+        commits = GitHubAnalyzer.get_error_or_json(self.session.get(url))
         commits = list(filter(
             lambda item: GitHubAnalyzer.compare_dates(
                 self.start, GitHubAnalyzer.get_input_date_by_format(item['commit']['committer']['date']),
@@ -205,7 +205,7 @@ class GitHubAnalyzer:
         pulls = []
         page = 1
         while True:
-            new_pulls = AnalyseException.get_error_or_json(
+            new_pulls = GitHubAnalyzer.get_error_or_json(
                 self.session.get(f'{self.base_url}/pulls?page={page}&per_page=1000&state=all'))
             if len(new_pulls) == 0:
                 break
